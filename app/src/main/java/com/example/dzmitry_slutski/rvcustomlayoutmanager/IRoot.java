@@ -1,5 +1,7 @@
 package com.example.dzmitry_slutski.rvcustomlayoutmanager;
 
+import java.util.List;
+
 /**
  * IRoot
  * Version info
@@ -9,8 +11,12 @@ package com.example.dzmitry_slutski.rvcustomlayoutmanager;
 
 public interface IRoot {
     String id();
-    int iconId();
+    int imageId();
 
     String title();
     String subTitle();
+
+    List<IModel> getModels();
+
+    int getColor();
 }

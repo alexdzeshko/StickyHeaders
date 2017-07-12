@@ -9,7 +9,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 /**
@@ -19,27 +18,49 @@ import java.util.List;
  * Created by Dzmitry_Slutski.
  */
 
-public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.CustomViewHolder> {
+public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.BaseViewHolder> {
 
-    private final List<IModel> mModels = new ArrayList<>();
+    private final List<Item> mModels = new ArrayList<>();
     private final LayoutInflater mInflater;
 
-    RecyclerAdapter(final Context pContext, final Collection<IModel> pModels) {
+    RecyclerAdapter(final Context pContext, final Iterable<IRoot> pModels) {
         mInflater = LayoutInflater.from(pContext);
-        mModels.addAll(pModels);
+
+        fillModelList(pModels);
+    }
+
+    private void fillModelList(final Iterable<IRoot> pModels) {
+        for (final IRoot season : pModels) {
+            Item item = new Item();
+            item.type = CustomLayoutManager.TYPE_SEASON;
+            item.item = season;
+            mModels.add(item);
+
+            final List<IModel> models = season.getModels();
+            for (final IModel episode : models) {
+                item = new Item();
+                item.type = CustomLayoutManager.TYPE_EPISOD;
+                item.item = episode;
+
+                mModels.add(item);
+            }
+        }
     }
 
     @Override
-    public RecyclerAdapter.CustomViewHolder onCreateViewHolder(final ViewGroup parent, final int viewType) {
-        return new CustomViewHolder(mInflater.inflate(R.layout.rv_simple_item, parent, false));
+    public RecyclerAdapter.BaseViewHolder onCreateViewHolder(final ViewGroup parent, final int viewType) {
+        if (viewType == CustomLayoutManager.TYPE_EPISOD) {
+            return new EpisodeViewHolder(mInflater.inflate(R.layout.rv_episode_item, parent, false));
+        } else if (viewType == CustomLayoutManager.TYPE_SEASON) {
+            return new SeasonViewHolder(mInflater.inflate(R.layout.rv_season_item, parent, false));
+        } else {
+            throw new RuntimeException("Unknown view type!");
+        }
     }
 
     @Override
-    public void onBindViewHolder(final RecyclerAdapter.CustomViewHolder holder, final int position) {
-        final IModel model = mModels.get(position);
-        holder.mImage.setImageResource(model.imageId());
-        holder.mTitle.setText(model.title());
-        holder.mSubTitle.setText(model.subTitle());
+    public void onBindViewHolder(final RecyclerAdapter.BaseViewHolder holder, final int position) {
+        holder.draw(mModels.get(position).item);
     }
 
     @Override
@@ -47,18 +68,76 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Custom
         return mModels.size();
     }
 
-    class CustomViewHolder extends RecyclerView.ViewHolder {
+    @Override
+    public int getItemViewType(final int position) {
+        return mModels.get(position).type;
+    }
+
+    abstract class BaseViewHolder<T> extends RecyclerView.ViewHolder {
+
+        BaseViewHolder(final View itemView) {
+            super(itemView);
+        }
+
+        protected abstract void draw(T t);
+    }
+
+    public void removeItem(int index) {
+        mModels.remove(index);
+        notifyItemRemoved(index);
+    }
+
+    class SeasonViewHolder extends BaseViewHolder<IRoot> {
 
         ImageView mImage;
         TextView mTitle;
         TextView mSubTitle;
 
-        CustomViewHolder(final View itemView) {
+        SeasonViewHolder(final View itemView) {
             super(itemView);
 
-            mImage = (ImageView) itemView.findViewById(R.id.image);
-            mTitle = (TextView) itemView.findViewById(R.id.title);
-            mSubTitle = (TextView) itemView.findViewById(R.id.sub_title);
+            mImage = (ImageView) itemView.findViewById(R.id.season_image);
+            mTitle = (TextView) itemView.findViewById(R.id.season_title);
+            mSubTitle = (TextView) itemView.findViewById(R.id.season_sub_title);
         }
+
+        @Override
+        protected void draw(final IRoot pIRoot) {
+            mImage.setImageResource(pIRoot.imageId());
+            mTitle.setText(pIRoot.title());
+            mSubTitle.setText(pIRoot.subTitle());
+
+            itemView.setBackgroundColor(pIRoot.getColor());
+        }
+    }
+
+    class EpisodeViewHolder extends BaseViewHolder<IModel> {
+
+        ImageView mImage;
+        TextView mTitle;
+        TextView mSubTitle;
+
+        EpisodeViewHolder(final View itemView) {
+            super(itemView);
+
+            mImage = (ImageView) itemView.findViewById(R.id.episode_image);
+            mTitle = (TextView) itemView.findViewById(R.id.episode_title);
+            mSubTitle = (TextView) itemView.findViewById(R.id.episode_sub_title);
+        }
+
+        @Override
+        protected void draw(final IModel pIModel) {
+            mImage.setImageResource(pIModel.imageId());
+            mTitle.setText(pIModel.title());
+            mSubTitle.setText(pIModel.subTitle());
+
+            itemView.setBackgroundColor(pIModel.getColor());
+        }
+    }
+
+    private class Item {
+
+        Object item;
+        int type;
     }
 }

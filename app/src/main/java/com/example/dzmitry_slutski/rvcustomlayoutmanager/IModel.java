@@ -16,4 +16,6 @@ public interface IModel {
     String subTitle();
 
     String rootId();
+
+    int getColor();
 }
