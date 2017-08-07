@@ -80,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
             String seasonTitle = "Season #" + i + " index: " + (index++);
             final List<IModel> models = new ArrayList<>();
             for (int episodeNumber = 0; episodeNumber < indexes[i]; episodeNumber++) {
-                models.add(new Model(getDrawableResIdByNumber(episodeNumber), "S" + i + ", Ep #" + episodeNumber + " index: " + index, "sub title: " + episodeNumber));
+                models.add(new Model(getDrawableResIdByNumber(episodeNumber), "S" + i + ", Ep #" + episodeNumber + " of " + indexes[i] + " index: " + index, "sub title: " + episodeNumber));
                 index++;
             }
 

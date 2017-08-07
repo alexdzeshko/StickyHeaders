@@ -129,8 +129,8 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         if (childCount == 0) {
             return 0;
         }
-        Log.d(TAG, "scrollVerticallyBy() called with: dy = [" + dy + "], childCount = [" + getChildCount() + "], state = [" + state + "]");
-        final int delta = scrollVerticallyInternal(dy);
+        final int delta = calculatePossibleScrollVertically(dy);
+        Log.d(TAG, "scrollVerticallyBy() called with: dy = [" + dy + "], childCount = [" + getChildCount() + "], delta = [" + delta + "]");
         offsetChildrenVertical(-delta);
         if (dy >= 0) {
             fillFromUpToDown(recycler);
@@ -320,46 +320,32 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         }
 
         //TODO probably TopIndexes could be RecyclerView.NO_POSITION should process that issue here
-
+        View previousSeason = null;
         int episodeViewTop = episodeTop;
-        int seasonViewTop = seasonTop;
+        int firstEpisodeInSeasonTop = episodeTop;
         int episodeLineHeight = 0;
         for (int i = seasonTopIndex; i < getItemCount(); i++) {
             final View currentView = getViewForPosition(pRecycler, i);
 
-            addView(currentView);
             if (mAdapter.getItemViewType(i) == TYPE_SEASON) {
-                if (seasonViewTop < episodeViewTop) {
-                    seasonViewTop = episodeViewTop;
+                if (previousSeason != null) {
+                    final int seasonViewBottom = layoutSeason(previousSeason, firstEpisodeInSeasonTop, episodeLineHeight);
+                    if (seasonViewBottom > episodeViewTop) {
+                        Log.d(TAG, "fillFromUpToDown() season = [" + seasonViewBottom + "]");
+                        episodeViewTop = seasonViewBottom;
+                    }
                 }
-                if (episodeViewTop < seasonViewTop) {
-                    episodeViewTop = seasonViewTop;
-                }
-                measureChild(currentView, 0, 0);
-                final int usedHeightForView = getDecoratedMeasuredHeight(currentView);
-                final int measuredWidth = getDecoratedMeasuredWidth(currentView);
-                if (seasonViewTop < 0) {
-                   // seasonViewTop = 0;
-                }
-                if (episodeLineHeight < usedHeightForView) {
-                    //seasonViewTop = episodeLineHeight - usedHeightForView;
-                }
-                layoutDecorated(currentView, 0, seasonViewTop, measuredWidth,
-                        seasonViewTop + usedHeightForView);
-
-                seasonViewTop += usedHeightForView;
                 episodeLineHeight = 0;
+                previousSeason = currentView;
+                firstEpisodeInSeasonTop = episodeViewTop;
             } else {
+                addView(currentView);
                 measureChild(currentView, mEpisodeHorizontalShift, 0);
                 final int usedHeightForView = getDecoratedMeasuredHeight(currentView);
                 final int measuredWidth = getDecoratedMeasuredWidth(currentView);
                 layoutDecorated(currentView, mEpisodeHorizontalShift, episodeViewTop,
                         mEpisodeHorizontalShift + measuredWidth, episodeViewTop + usedHeightForView);
-                /*Log.d(TAG, "onLayoutChildren() = " +
-                        "   L: [" + mEpisodeHorizontalShift +
-                        "], T: [" + episodeViewTop +
-                        "], R: [" + (mEpisodeHorizontalShift + measuredWidth) +
-                        "], B: [" + (episodeViewTop + usedHeightForView) + "] childCount: " + getChildCount());*/
+
                 episodeViewTop += usedHeightForView;
                 episodeLineHeight += usedHeightForView;
             }
@@ -367,8 +353,27 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
                 break;
             }
         }
-
+        layoutSeason(previousSeason, firstEpisodeInSeasonTop, episodeLineHeight);
+        //todo add season if not added yet
         recycleViewsFromCache(pRecycler);
+    }
+
+    private int layoutSeason(final View pSeasonView, final int pFirstEpisodeInSeasonTop, final int pEpisodeLineHeight) {
+        int seasonViewTop = pFirstEpisodeInSeasonTop;
+        addView(pSeasonView);
+        measureChild(pSeasonView, 0, 0);
+        final int usedHeightForView = getDecoratedMeasuredHeight(pSeasonView);
+        final int measuredWidth = getDecoratedMeasuredWidth(pSeasonView);
+
+        if (pFirstEpisodeInSeasonTop < 0 && pEpisodeLineHeight + pFirstEpisodeInSeasonTop >= usedHeightForView) {
+//            seasonViewTop = 0;
+            Log.d(TAG, "layoutSeason() seasonViewTop = 0 should be!");
+        }
+
+        layoutDecorated(pSeasonView, 0, seasonViewTop, measuredWidth,
+                seasonViewTop + usedHeightForView);
+
+        return seasonViewTop + usedHeightForView;
     }
 
     private void fillViewCacheAndDetachFromRecyclerView(final RecyclerView.Recycler pRecycler) {
@@ -391,7 +396,7 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         mViewCache.clear();
     }
 
-    private int scrollVerticallyInternal(final int dy) {
+    private int calculatePossibleScrollVertically(final int dy) {
         final int childCount = getChildCount();
         if (childCount == 0) {
             return 0;
@@ -442,9 +447,6 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
             }
         }
 
-        if (lastView == null) {
-            lastView = getChildAt(viewChildCount - 1);
-        }
         return lastView;
     }
 
