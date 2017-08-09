@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -9,41 +8,29 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content"
+        android:gravity="center">
 
-        <TextView
-            android:id="@+id/removeButton"
+        <Button
+            android:id="@+id/btnShowCustomLayout"
+            style="?android:attr/buttonBarButtonStyle"
             android:layout_width="wrap_content"
-            android:gravity="center"
-            android:layout_height="match_parent"
-            android:text="Remove item#"/>
+            android:layout_height="wrap_content"
+            android:text="Layout Manager" />
 
-        <EditText
-            android:id="@+id/number"
-            android:layout_width="100dp"
-            android:layout_height="match_parent"
-            android:text="5"
-            android:inputType="numberSigned"/>
-
-        <TextView
-            android:id="@+id/requestLayout"
+        <Button
+            style="?android:attr/buttonBarButtonStyle"
+            android:id="@+id/btnShowCustomView"
             android:layout_width="wrap_content"
-            android:gravity="center"
-            android:layout_height="match_parent"
-            android:text="requestLayout"/>
-
-        <TextView
-            android:id="@+id/scrollDown"
-            android:layout_width="wrap_content"
-            android:gravity="center"
-            android:layout_height="match_parent"
-            android:text="scroll down"/>
+            android:layout_height="wrap_content"
+            android:text="Custom View" />
     </LinearLayout>
 
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/recycler"
+    <FrameLayout
+        android:id="@+id/content_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="match_parent">
+
+    </FrameLayout>
 
 </LinearLayout>
