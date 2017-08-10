@@ -38,9 +38,8 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
     private int mCurrentHeaderHeight;
     private int mCurrentItemListHeight;
     private int mItemBottom;
-    private int mHeaderBottom;
     private final List<View> mItemsIndexes = new ArrayList<>();
-    private boolean isNotFirstSeasonFill;
+    private boolean isNotFirstSectionFill;
 
 
     public CustomLayoutManager(final int pEpisodeHorizontalShift) {
@@ -130,23 +129,6 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
     }
 
     @Override
-    public void onAdapterChanged(final RecyclerView.Adapter oldAdapter, final RecyclerView.Adapter newAdapter) {
-        super.onAdapterChanged(oldAdapter, newAdapter);
-
-        mAdapter = newAdapter;
-    }
-
-    @Override
-    public RecyclerView.LayoutParams generateDefaultLayoutParams() {
-        return new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    }
-
-    @Override
-    public boolean canScrollVertically() {
-        return true;
-    }
-
-    @Override
     public int scrollVerticallyBy(final int dy, final RecyclerView.Recycler recycler, final RecyclerView.State state) {
         final int childCount = getChildCount();
         if (childCount == 0) {
@@ -159,84 +141,224 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         offsetChildrenVertical(-delta);
         if (dy >= 0) {
             // Contents are scrolling up
-            fillFromUpToDown(recycler);
+            fillFromTopToBottom(recycler);
         } else {
-            fillFromDownToUp(recycler);
+            fillFromBottomToTop(recycler);
         }
         return delta;
     }
 
-    private void fillFromDownToUp(final RecyclerView.Recycler pRecycler) {
+    private void fillFromBottomToTop(final RecyclerView.Recycler pRecycler) {
 
-        Log.d(TAG, "fillFromDownToUp() called with");
+        Log.d(TAG, "fillFromBottomToTop() called with");
+
         fillViewCacheAndDetachFromRecyclerView(pRecycler);
         mItemsIndexes.clear();
 
-        int seasonBottomIndex = RecyclerView.NO_POSITION;
-        int episodeBottomIndex = RecyclerView.NO_POSITION;
+        int headerBottomIndex = RecyclerView.NO_POSITION;
+        int itemBottomIndex = RecyclerView.NO_POSITION;
         mItemBottom = 0;
-        mHeaderBottom = 0;
+        int headerBottom = 0;
 
         final int recyclerViewHeight = getHeight();
+
         for (int i = 0; i < mViewCache.size(); i++) {
+
             final View child = mViewCache.valueAt(i);
-            final int adapterPos = getPosition(child);
+            final int adapterPosition = getPosition(child);
 
             final int decoratedBottom = getDecoratedBottom(child);
             final int decoratedTop = getDecoratedTop(child);
 
             final boolean isInBoundOfRecyclerView = decoratedTop <= recyclerViewHeight;
-            if (mAdapter.getItemViewType(i) == TYPE_HEADER) {
-                if (decoratedBottom > mHeaderBottom && isInBoundOfRecyclerView) {
-                    seasonBottomIndex = adapterPos;
-                    mHeaderBottom = decoratedBottom;
+
+            if (isInBoundOfRecyclerView) {
+                if (mAdapter.getItemViewType(adapterPosition) == TYPE_HEADER) {
+                    if (decoratedBottom > headerBottom) {
+                        headerBottomIndex = adapterPosition;
+                        headerBottom = decoratedBottom;
+                    }
+                } else {
+                    if (decoratedBottom > mItemBottom) {
+                        itemBottomIndex = adapterPosition;
+                        mItemBottom = decoratedBottom;
+                    }
                 }
             } else {
-                if (decoratedBottom > mItemBottom && isInBoundOfRecyclerView) {
-                    episodeBottomIndex = adapterPos;
-                    mItemBottom = decoratedBottom;
-                }
+                break;
             }
         }
 
-        Log.d(TAG, "fillFromDownToUp() indexes: sInd: " + seasonBottomIndex +
-                " sB: " + mHeaderBottom +
-                " eI : " + episodeBottomIndex +
+        Log.d(TAG, "fillFromBottomToTop() indexes: sInd: " + headerBottomIndex +
+                " sB: " + headerBottom +
+                " eI : " + itemBottomIndex +
                 " eB: " + mItemBottom);
         //TODO probably TopIndexes could be RecyclerView.NO_POSITION should process that issue here
 
         mCurrentItemListHeight = 0;
         mCurrentHeaderHeight = 0;
-        isNotFirstSeasonFill = false;
-        int episodeViewBottom = mItemBottom;
-        for (int i = episodeBottomIndex; i >= 0; i--) {
+        isNotFirstSectionFill = false;
+        int itemViewBottom = mItemBottom;
+
+        for (int i = itemBottomIndex; i >= 0; i--) {
+
             final View currentView = getViewForPosition(pRecycler, i);
             if (mAdapter.getItemViewType(i) == TYPE_HEADER) {
-                fillSeasonAndEpisodes(currentView);
-                episodeViewBottom = mItemBottom;
+
+                fillHeaderAndItems(currentView);
+//                itemViewBottom = mItemBottom;
             } else {
-                /*if (mItemBottom == -1) {
-                    mItemBottom = episodeViewBottom;
-                }*/
+
                 measureChild(currentView, mItemHorizontalShift, 0);
+
                 final int usedHeightForView = getDecoratedMeasuredHeight(currentView);
-                final int measuredWidth = getDecoratedMeasuredWidth(currentView);
-                episodeViewBottom -= usedHeightForView;
+//                final int measuredWidth = getDecoratedMeasuredWidth(currentView);
+
+                itemViewBottom -= usedHeightForView;
                 mCurrentItemListHeight += usedHeightForView;
                 mItemsIndexes.add(currentView);
             }
-            if (episodeViewBottom < 0) {
-                Log.d(TAG, "fillFromDownToUp() called with: episodeViewBottom < 0!");
-                fillSeasonAndEpisodes(findSeasonView(i, pRecycler));
+            if (itemViewBottom < 0) {
+                Log.d(TAG, "fillFromBottomToTop() called with: itemViewBottom < 0!");
+                fillHeaderAndItems(findHeaderView(i, pRecycler));
                 break;
             }
         }
-        Log.d(TAG, "fillFromDownToUp() called with: FINISHED");
+        Log.d(TAG, "fillFromBottomToTop() called with: FINISHED");
         recycleViewsFromCache(pRecycler);
     }
 
+    private void fillFromTopToBottom(final RecyclerView.Recycler pRecycler) {
+
+        fillViewCacheAndDetachFromRecyclerView(pRecycler);
+
+        int topHeaderAdapterPosition = RecyclerView.NO_POSITION;
+        int itemTopIndex = RecyclerView.NO_POSITION;
+        int itemTop = 0;
+        int headerTop = 0;
+
+        for (int i = 0; i < mViewCache.size(); i++) {
+
+            final View child = mViewCache.valueAt(i);
+            final int adapterPosition = mViewCache.keyAt(i);
+
+            final int decoratedTop = getDecoratedTop(child);
+            final int decoratedBottom = getDecoratedBottom(child);
+
+            final boolean isInBoundOfRecyclerView = decoratedBottom >= 0;
+
+            if (isInBoundOfRecyclerView) {
+
+                if (mAdapter.getItemViewType(adapterPosition) == TYPE_HEADER) {
+                    if (topHeaderAdapterPosition == RecyclerView.NO_POSITION) {
+                        topHeaderAdapterPosition = adapterPosition;
+                        itemTop = decoratedTop;
+                        // TODO: 8/10/17 header top coordinate should be alligned with first item in section
+                        // or pushed up by header below
+                        // belowHeaderTop
+                    }
+                } else {
+                    if (itemTopIndex == RecyclerView.NO_POSITION) {
+                        itemTopIndex = adapterPosition;
+                        headerTop = decoratedTop;
+                    }
+                }
+            }
+        }
+
+        View previousHeader = null; // TODO: 8/10/17 find previous header
+
+        int firstItemInSectionTop = itemTop;
+        int itemsSectionHeight = 0;
+
+        for (int i = topHeaderAdapterPosition; i < getItemCount(); i++) {
+            final View currentView = getViewForPosition(pRecycler, i);
+
+            if (mAdapter.getItemViewType(i) == TYPE_HEADER) {
+
+                //layout header
+
+                if (previousHeader != null) {
+                    final int headerViewBottom = layoutHeaderReturnHeaderBottom(previousHeader, firstItemInSectionTop, itemsSectionHeight);
+                    if (headerViewBottom > itemTop) {
+                        itemTop = headerViewBottom;
+                    }
+                }
+                itemsSectionHeight = 0;
+                previousHeader = currentView;
+                firstItemInSectionTop = itemTop;
+
+            } else {
+
+                //measure and layout item
+
+                addView(currentView);
+                measureChild(currentView, mItemHorizontalShift, 0);
+                final int usedHeightForView = getDecoratedMeasuredHeight(currentView);
+                final int measuredWidth = getDecoratedMeasuredWidth(currentView);
+                layoutDecorated(currentView, mItemHorizontalShift, itemTop,
+                        mItemHorizontalShift + measuredWidth, itemTop + usedHeightForView);
+
+                itemTop += usedHeightForView;
+                itemsSectionHeight += usedHeightForView;
+
+            }
+            if (itemTop > getHeight()) {
+                break;
+            }
+        }
+        layoutHeaderReturnHeaderBottom(previousHeader, firstItemInSectionTop, itemsSectionHeight);
+        //todo add season if not added yet
+        recycleViewsFromCache(pRecycler);
+    }
+
+    private void fillHeaderAndItems(final View headerView) {
+        Log.d(TAG, "fillHeaderAndItems() called with: episode count: " + mItemsIndexes.size());
+        measureChild(headerView, 0, 0);
+        final int headerViewHeight = getDecoratedMeasuredHeight(headerView);
+        final int headerViewWidth = getDecoratedMeasuredWidth(headerView);
+
+//        mHeaderBottom, mItemBottom
+        if (mCurrentItemListHeight < headerViewHeight && isNotFirstSectionFill && (mItemBottom - mCurrentItemListHeight > 0)) {
+            mItemBottom = mItemBottom - (headerViewHeight - mCurrentItemListHeight);
+        }
+        isNotFirstSectionFill = true;
+        int lineItemBottom = mItemBottom;
+        for (final View itemView : mItemsIndexes) {
+            addView(itemView);
+            int top = mItemBottom - getDecoratedMeasuredHeight(itemView);
+            layoutDecorated(itemView, mItemHorizontalShift,
+                    top,
+                    mItemHorizontalShift + getDecoratedMeasuredWidth(itemView),
+                    mItemBottom);
+            Log.d(TAG, "fillHeaderAndItems() Ep: [" + top + "]");
+            mItemBottom = top;
+        }
+        addView(headerView);
+
+        int headerTop = mItemBottom;
+        if (headerTop < 0) {
+            headerTop = 0;
+        }
+        if (lineItemBottom - headerViewHeight < 0) {
+            headerTop = lineItemBottom - headerViewHeight;
+        }
+
+        layoutDecorated(headerView, 0,
+                headerTop,
+                headerViewWidth,
+                headerTop + headerViewHeight);
+        Log.d(TAG, "fillHeaderAndItems() sTop: [" + mItemBottom + "]");
+
+//        mHeaderBottom = -1;
+//        mItemBottom = -1;
+        mCurrentItemListHeight = 0;
+        mCurrentHeaderHeight = 0;
+        mItemsIndexes.clear();
+    }
+
     @Nullable
-    private View findSeasonView(final int findFromIndex, final RecyclerView.Recycler pRecycler) {
+    private View findHeaderView(final int findFromIndex, final RecyclerView.Recycler pRecycler) {
         for (int i = findFromIndex; i >= 0; i--) {
             final View currentView = getViewForPosition(pRecycler, i);
             if (mAdapter.getItemViewType(i) == TYPE_HEADER) {
@@ -245,51 +367,6 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         }
 
         return null;
-    }
-
-    private void fillSeasonAndEpisodes(final View seasonView) {
-        Log.d(TAG, "fillSeasonAndEpisodes() called with: episode count: " + mItemsIndexes.size());
-        measureChild(seasonView, 0, 0);
-        final int seasonViewHeight = getDecoratedMeasuredHeight(seasonView);
-        final int seasonViewWidth = getDecoratedMeasuredWidth(seasonView);
-
-//        mHeaderBottom, mItemBottom
-        if (mCurrentItemListHeight < seasonViewHeight && isNotFirstSeasonFill && (mItemBottom - mCurrentItemListHeight > 0)) {
-            mItemBottom = mItemBottom - (seasonViewHeight - mCurrentItemListHeight);
-        }
-        isNotFirstSeasonFill = true;
-        int lineEpisodeBottom = mItemBottom;
-        for (final View episodeView : mItemsIndexes) {
-            addView(episodeView);
-            int top = mItemBottom - getDecoratedMeasuredHeight(episodeView);
-            layoutDecorated(episodeView, mItemHorizontalShift,
-                    top,
-                    mItemHorizontalShift + getDecoratedMeasuredWidth(episodeView),
-                    mItemBottom);
-            Log.d(TAG, "fillSeasonAndEpisodes() Ep: [" + top + "]");
-            mItemBottom = top;
-        }
-        addView(seasonView);
-
-        int seasonTop = mItemBottom;
-        if (seasonTop < 0) {
-            seasonTop = 0;
-        }
-        if (lineEpisodeBottom - seasonViewHeight < 0) {
-            seasonTop = lineEpisodeBottom - seasonViewHeight;
-        }
-
-        layoutDecorated(seasonView, 0,
-                seasonTop,
-                seasonViewWidth,
-                seasonTop + seasonViewHeight);
-        Log.d(TAG, "fillSeasonAndEpisodes() sTop: [" + mItemBottom + "]");
-
-//        mHeaderBottom = -1;
-//        mItemBottom = -1;
-        mCurrentItemListHeight = 0;
-        mCurrentHeaderHeight = 0;
-        mItemsIndexes.clear();
     }
 
     @NonNull
@@ -310,104 +387,25 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         return view;
     }
 
-    private void fillFromUpToDown(final RecyclerView.Recycler pRecycler) {
-        fillViewCacheAndDetachFromRecyclerView(pRecycler);
+    private int layoutHeaderReturnHeaderBottom(final View pHeaderView, final int pFirstItemInSectionTop, final int pItemLineHeight) {
 
-        int headerTopIndex = 0;//RecyclerView.NO_POSITION;
-        int itemTopIndex = 0;//RecyclerView.NO_POSITION;
-        int itemTop = 0;
-        int headerTop = 0;
+        int headerViewTop = pFirstItemInSectionTop;
 
-        boolean isTopVisibleItemFound = false;
-        boolean isTopVisibleHeaderFound = false;
+        addView(pHeaderView);
 
-        for (int i = 0; i < mViewCache.size(); i++) {
-            final View child = mViewCache.valueAt(i);
-//            final int pos = getPosition(child);
-//            mViewCache.put(pos, child);
+        measureChild(pHeaderView, 0, 0);
 
-            final int decoratedTop = getDecoratedTop(child);
-            final int decoratedBottom = getDecoratedBottom(child);
+        final int usedHeightForView = getDecoratedMeasuredHeight(pHeaderView);
+        final int measuredWidth = getDecoratedMeasuredWidth(pHeaderView);
 
-            final int adapterPos = mViewCache.keyAt(i);
-            if (decoratedTop < 0 && decoratedBottom >= 0) {
-
-                if (!isTopVisibleHeaderFound) {
-                    headerTopIndex = adapterPos;
-                    itemTop = decoratedTop;
-                    isTopVisibleHeaderFound = true;
-
-                } else if (!isTopVisibleItemFound) {
-                    itemTopIndex = adapterPos;
-                    headerTop = decoratedTop;
-                    isTopVisibleItemFound = true;
-                }
-            }
+        if (pFirstItemInSectionTop < 0 && pItemLineHeight + pFirstItemInSectionTop >= usedHeightForView) {
+//            headerViewTop = 0;
+            Log.d(TAG, "layoutHeaderReturnHeaderBottom() headerViewTop = 0 should be!");
         }
 
-        //TODO probably TopIndexes could be RecyclerView.NO_POSITION should process that issue here
-        View previousSeason = null;
-        int episodeViewTop = itemTop;
-        int firstEpisodeInSeasonTop = itemTop;
-        int episodeLineHeight = 0;
+        layoutDecorated(pHeaderView, 0, headerViewTop, measuredWidth, headerViewTop + usedHeightForView);
 
-        for (int i = headerTopIndex; i < getItemCount(); i++) {
-            final View currentView = getViewForPosition(pRecycler, i);
-
-            if (mAdapter.getItemViewType(i) == TYPE_HEADER) {
-
-                //
-
-                if (previousSeason != null) {
-                    final int seasonViewBottom = layoutHeader(previousSeason, firstEpisodeInSeasonTop, episodeLineHeight);
-                    if (seasonViewBottom > episodeViewTop) {
-                        Log.d(TAG, "fillFromUpToDown() season = [" + seasonViewBottom + "]");
-                        episodeViewTop = seasonViewBottom;
-                    }
-                }
-                episodeLineHeight = 0;
-                previousSeason = currentView;
-                firstEpisodeInSeasonTop = episodeViewTop;
-
-            } else {
-
-                //measure and layout item
-
-                addView(currentView);
-                measureChild(currentView, mItemHorizontalShift, 0);
-                final int usedHeightForView = getDecoratedMeasuredHeight(currentView);
-                final int measuredWidth = getDecoratedMeasuredWidth(currentView);
-                layoutDecorated(currentView, mItemHorizontalShift, episodeViewTop,
-                        mItemHorizontalShift + measuredWidth, episodeViewTop + usedHeightForView);
-
-                episodeViewTop += usedHeightForView;
-                episodeLineHeight += usedHeightForView;
-
-            }
-            if (episodeViewTop > getHeight()) {
-                break;
-            }
-        }
-        layoutHeader(previousSeason, firstEpisodeInSeasonTop, episodeLineHeight);
-        //todo add season if not added yet
-        recycleViewsFromCache(pRecycler);
-    }
-
-    private int layoutHeader(final View pSeasonView, final int pFirstEpisodeInSeasonTop, final int pEpisodeLineHeight) {
-        int seasonViewTop = pFirstEpisodeInSeasonTop;
-        addView(pSeasonView);
-        measureChild(pSeasonView, 0, 0);
-        final int usedHeightForView = getDecoratedMeasuredHeight(pSeasonView);
-        final int measuredWidth = getDecoratedMeasuredWidth(pSeasonView);
-
-        if (pFirstEpisodeInSeasonTop < 0 && pEpisodeLineHeight + pFirstEpisodeInSeasonTop >= usedHeightForView) {
-//            seasonViewTop = 0;
-            Log.d(TAG, "layoutHeader() seasonViewTop = 0 should be!");
-        }
-
-        layoutDecorated(pSeasonView, 0, seasonViewTop, measuredWidth, seasonViewTop + usedHeightForView);
-
-        return seasonViewTop + usedHeightForView;
+        return headerViewTop + usedHeightForView;
     }
 
     private void fillViewCacheAndDetachFromRecyclerView(final RecyclerView.Recycler pRecycler) {
@@ -431,6 +429,7 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
     }
 
     private int calculatePossibleScrollVertically(final int dy) {
+        // TODO: 8/10/17 return correct value to stop overscrolling
         /*final int childCount = getChildCount();
         if (childCount == 0) {
             return 0;
@@ -508,17 +507,6 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         return topView;
     }
 
-    @Override
-    public void onDetachedFromWindow(final RecyclerView view, final RecyclerView.Recycler recycler) {
-        super.onDetachedFromWindow(view, recycler);
-
-        if (mAttachedRecyclerView != null) {
-            mAttachedRecyclerView.removeOnScrollListener(mOnScrollListener);
-            mAttachedRecyclerView.setOnFlingListener(null);
-            mAttachedRecyclerView = null;
-        }
-    }
-
     private View findFirstVisibleItem() {
         for (int i = 0; i < getChildCount(); i++) {
             final View child = getChildAt(i);
@@ -528,6 +516,34 @@ public class CustomLayoutManager extends RecyclerView.LayoutManager {
         }
 
         return null;
+    }
+
+    @Override
+    public void onAdapterChanged(final RecyclerView.Adapter oldAdapter, final RecyclerView.Adapter newAdapter) {
+        super.onAdapterChanged(oldAdapter, newAdapter);
+
+        mAdapter = newAdapter;
+    }
+
+    @Override
+    public RecyclerView.LayoutParams generateDefaultLayoutParams() {
+        return new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    @Override
+    public boolean canScrollVertically() {
+        return true;
+    }
+
+    @Override
+    public void onDetachedFromWindow(final RecyclerView view, final RecyclerView.Recycler recycler) {
+        super.onDetachedFromWindow(view, recycler);
+
+        if (mAttachedRecyclerView != null) {
+            mAttachedRecyclerView.removeOnScrollListener(mOnScrollListener);
+            mAttachedRecyclerView.setOnFlingListener(null);
+            mAttachedRecyclerView = null;
+        }
     }
 
     private class FlingListener extends RecyclerView.OnFlingListener {

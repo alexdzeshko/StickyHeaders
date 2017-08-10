@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity() {
             showFragment(2)
         }
 
+        showFragment(1)
     }
 
     private fun showFragment(id: Int) {
